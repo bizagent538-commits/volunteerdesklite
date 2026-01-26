@@ -1296,39 +1296,6 @@ function MemberFormModal({ member, onClose, onSave }) {
     </div>
   );
 }
-                onChange={(e) => setFormData({...formData, is_admin: e.target.checked})}
-                className="rounded"
-              />
-              <span className="text-sm">Admin</span>
-            </label>
-          </div>
-          
-          {error && (
-            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>
-          )}
-          
-          <div className="flex gap-2 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2 px-4 border rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 py-2 px-4 text-white rounded-lg"
-              style={{ backgroundColor: CONFIG.primaryColor }}
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 // Main App Component
 function App() {
