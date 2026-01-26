@@ -5,11 +5,11 @@
 CREATE TABLE IF NOT EXISTS members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_number VARCHAR(50) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255) NOT NULL,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(20),
-  is_active BOOLEAN DEFAULT true,
+  status VARCHAR(20) DEFAULT 'Active',
   is_admin BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -57,6 +57,6 @@ CREATE POLICY "Allow all for events" ON events FOR ALL USING (true);
 CREATE POLICY "Allow all for event_signups" ON event_signups FOR ALL USING (true);
 
 -- Insert a default admin member (change these values!)
-INSERT INTO members (member_number, email, first_name, last_name, is_admin, is_active)
-VALUES ('ADMIN001', 'admin@example.com', 'Admin', 'User', true, true)
+INSERT INTO members (member_number, email, first_name, last_name, is_admin, status)
+VALUES ('ADMIN001', 'admin@example.com', 'Admin', 'User', true, 'Active')
 ON CONFLICT (member_number) DO NOTHING;
