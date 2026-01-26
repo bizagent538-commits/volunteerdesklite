@@ -162,12 +162,41 @@ function EventCard({ event, memberId, onSignup, onCancel, isSignedUp }) {
   );
 }
 
-// Member Dashboard
+// Calendar helpers
+function getCalendarDays(year, month) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+  
+  const days = [];
+  
+  // Add empty slots for days before the first of the month
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    days.push(null);
+  }
+  
+  // Add all days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    days.push(new Date(year, month, day));
+  }
+  
+  return days;
+}
+
+function isSameDay(date1, date2) {
+  if (!date1 || !date2) return false;
+  return date1.toDateString() === date2.toDateString();
+}
+
+// Member Dashboard with Calendar View
 function MemberDashboard({ member, onLogout }) {
   const [events, setEvents] = useState([]);
   const [mySignups, setMySignups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('upcoming');
+  const [view, setView] = useState('calendar');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -222,14 +251,40 @@ function MemberDashboard({ member, onLogout }) {
     }
   };
 
+  const goToPreviousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const getEventsForDate = (date) => {
+    if (!date) return [];
+    const dateStr = date.toISOString().split('T')[0];
+    return events.filter(event => event.event_date === dateStr);
+  };
+
   const filteredEvents = view === 'my-signups' 
     ? events.filter(e => mySignups.includes(e.id))
-    : events;
+    : view === 'list'
+    ? events
+    : selectedDate
+    ? getEventsForDate(selectedDate)
+    : [];
+
+  const calendarDays = getCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="text-white p-4 shadow-md" style={{ backgroundColor: CONFIG.primaryColor }}>
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold">{CONFIG.orgName}</h1>
             <p className="text-sm opacity-90">Welcome, {member.first_name}!</p>
@@ -243,16 +298,25 @@ function MemberDashboard({ member, onLogout }) {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-4">
-        <div className="flex gap-2 mb-4">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button
-            onClick={() => setView('upcoming')}
+            onClick={() => { setView('calendar'); setSelectedDate(null); }}
             className={`px-4 py-2 rounded-lg transition-colors ${
-              view === 'upcoming' ? 'text-white' : 'bg-white text-gray-700'
+              view === 'calendar' ? 'text-white' : 'bg-white text-gray-700'
             }`}
-            style={{ backgroundColor: view === 'upcoming' ? CONFIG.primaryColor : undefined }}
+            style={{ backgroundColor: view === 'calendar' ? CONFIG.primaryColor : undefined }}
           >
-            Upcoming Events
+            📅 Calendar
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              view === 'list' ? 'text-white' : 'bg-white text-gray-700'
+            }`}
+            style={{ backgroundColor: view === 'list' ? CONFIG.primaryColor : undefined }}
+          >
+            📋 List View
           </button>
           <button
             onClick={() => setView('my-signups')}
@@ -261,31 +325,163 @@ function MemberDashboard({ member, onLogout }) {
             }`}
             style={{ backgroundColor: view === 'my-signups' ? CONFIG.primaryColor : undefined }}
           >
-            My Sign-ups ({mySignups.length})
+            ✓ My Sign-ups ({mySignups.length})
           </button>
         </div>
 
         {loading ? (
           <div className="text-center py-8 text-gray-500">Loading events...</div>
-        ) : filteredEvents.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {view === 'my-signups' ? 'You haven\'t signed up for any events yet.' : 'No upcoming events.'}
-          </div>
         ) : (
-          filteredEvents.map(event => (
-            <EventCard
-              key={event.id}
-              event={event}
-              memberId={member.id}
-              onSignup={handleSignup}
-              onCancel={handleCancel}
-              isSignedUp={mySignups.includes(event.id)}
-            />
-          ))
+          <>
+            {view === 'calendar' && (
+              <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <button
+                    onClick={goToPreviousMonth}
+                    className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    ← Prev
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold">
+                      {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                    </h2>
+                    <button
+                      onClick={goToToday}
+                      className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                    >
+                      Today
+                    </button>
+                  </div>
+                  <button
+                    onClick={goToNextMonth}
+                    className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    Next →
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1">
+                  {dayNames.map(day => (
+                    <div key={day} className="text-center font-semibold text-gray-600 p-2 text-sm">
+                      {day}
+                    </div>
+                  ))}
+                  {calendarDays.map((day, index) => {
+                    const dayEvents = day ? getEventsForDate(day) : [];
+                    const isToday = day && isSameDay(day, new Date());
+                    const isSelected = day && selectedDate && isSameDay(day, selectedDate);
+                    
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => day && setSelectedDate(day)}
+                        className={`min-h-24 p-2 border rounded cursor-pointer transition-colors ${
+                          !day ? 'bg-gray-50' : isSelected ? 'bg-blue-100 border-blue-500' : isToday ? 'bg-green-50 border-green-500' : 'bg-white hover:bg-gray-50'
+                        }`}
+                      >
+                        {day && (
+                          <>
+                            <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-green-700' : 'text-gray-700'}`}>
+                              {day.getDate()}
+                            </div>
+                            {dayEvents.map(event => (
+                              <div
+                                key={event.id}
+                                className="text-xs p-1 mb-1 rounded truncate"
+                                style={{ backgroundColor: getCategoryColor(event.category) }}
+                                title={event.title}
+                              >
+                                {event.title}
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedDate && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h3 className="font-semibold mb-2">
+                      Events on {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </h3>
+                    {filteredEvents.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No events on this day.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredEvents.map(event => (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            memberId={member.id}
+                            onSignup={handleSignup}
+                            onCancel={handleCancel}
+                            isSignedUp={mySignups.includes(event.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'list' && (
+              <div>
+                {filteredEvents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">No upcoming events.</div>
+                ) : (
+                  filteredEvents.map(event => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      memberId={member.id}
+                      onSignup={handleSignup}
+                      onCancel={handleCancel}
+                      isSignedUp={mySignups.includes(event.id)}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {view === 'my-signups' && (
+              <div>
+                {filteredEvents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">You haven't signed up for any events yet.</div>
+                ) : (
+                  filteredEvents.map(event => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      memberId={member.id}
+                      onSignup={handleSignup}
+                      onCancel={handleCancel}
+                      isSignedUp={mySignups.includes(event.id)}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   );
+}
+
+// Helper function for category colors
+function getCategoryColor(category) {
+  const colors = {
+    'Kitchen': '#fef3c7',
+    'Range Safety': '#dbeafe',
+    'Grounds': '#d1fae5',
+    'Work Party': '#fce7f3',
+    'Club Events': '#e0e7ff',
+  };
+  return colors[category] || '#f3f4f6';
 }
 
 // Admin Dashboard
@@ -296,8 +492,10 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
   const [loading, setLoading] = useState(true);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -334,10 +532,15 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
     loadData();
   };
 
+  const handleSendEventSMS = (event) => {
+    setSelectedEvent(event);
+    setShowSMSModal(true);
+  };
+
   const handleToggleMemberStatus = async (memberId, currentStatus) => {
     await supabase
       .from('members')
-      .update({ is_active: !currentStatus })
+      .update({ status: currentStatus === 'Active' ? 'Inactive' : 'Active' })
       .eq('id', memberId);
     loadData();
   };
@@ -433,6 +636,13 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
                               className="text-blue-600 hover:underline mr-3"
                             >
                               Edit
+                            </button>
+                            <button
+                              onClick={() => handleSendEventSMS(event)}
+                              className="text-green-600 hover:underline mr-3"
+                              title="Send SMS to volunteers"
+                            >
+                              📱 SMS
                             </button>
                             <button
                               onClick={() => handleDeleteEvent(event.id)}
@@ -563,6 +773,234 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
           onSave={() => { setShowMemberForm(false); loadData(); }}
         />
       )}
+
+      {showSMSModal && selectedEvent && (
+        <SMSModal
+          event={selectedEvent}
+          onClose={() => { setShowSMSModal(false); setSelectedEvent(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// SMS Modal Component
+function SMSModal({ event, onClose }) {
+  const [volunteers, setVolunteers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState('');
+  const [results, setResults] = useState([]);
+  const [twilioConfigured, setTwilioConfigured] = useState(true);
+
+  useEffect(() => {
+    loadVolunteers();
+    
+    // Set default message
+    const defaultMsg = `Reminder: ${event.title} on ${formatDate(event.event_date)}${event.start_time ? ` at ${formatTime(event.start_time)}` : ''}. ${event.location ? `Location: ${event.location}.` : ''} Thank you for volunteering!`;
+    setMessage(defaultMsg);
+  }, []);
+
+  const loadVolunteers = async () => {
+    setLoading(true);
+    
+    // Get all signups for this event with member details
+    const { data: signups } = await supabase
+      .from('event_signups')
+      .select(`
+        member_id,
+        members (
+          id,
+          first_name,
+          last_name,
+          phone,
+          email
+        )
+      `)
+      .eq('event_id', event.id);
+
+    const volunteersWithPhone = (signups || [])
+      .map(s => s.members)
+      .filter(m => m && m.phone);
+    
+    setVolunteers(volunteersWithPhone);
+    setLoading(false);
+  };
+
+  const handleSendSMS = async () => {
+    if (!message.trim()) {
+      alert('Please enter a message');
+      return;
+    }
+
+    if (volunteers.length === 0) {
+      alert('No volunteers with phone numbers found for this event');
+      return;
+    }
+
+    if (!confirm(`Send SMS to ${volunteers.length} volunteer(s)?`)) {
+      return;
+    }
+
+    setSending(true);
+    const sendResults = [];
+
+    for (const volunteer of volunteers) {
+      try {
+        const response = await fetch('/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: volunteer.phone,
+            message: message,
+            eventTitle: event.title
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          sendResults.push({
+            name: `${volunteer.first_name} ${volunteer.last_name}`,
+            phone: volunteer.phone,
+            status: 'sent',
+            messageSid: data.messageSid
+          });
+        } else {
+          if (data.configured === false) {
+            setTwilioConfigured(false);
+            setSending(false);
+            return;
+          }
+          sendResults.push({
+            name: `${volunteer.first_name} ${volunteer.last_name}`,
+            phone: volunteer.phone,
+            status: 'failed',
+            error: data.error || 'Unknown error'
+          });
+        }
+      } catch (error) {
+        sendResults.push({
+          name: `${volunteer.first_name} ${volunteer.last_name}`,
+          phone: volunteer.phone,
+          status: 'failed',
+          error: error.message
+        });
+      }
+    }
+
+    setResults(sendResults);
+    setSending(false);
+  };
+
+  if (!twilioConfigured) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6">
+          <h2 className="text-xl font-semibold mb-4 text-red-600">Twilio Not Configured</h2>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-sm mb-2">To enable SMS notifications, you need to configure Twilio environment variables in your Vercel project:</p>
+            <ul className="text-sm space-y-1 ml-4 list-disc">
+              <li><code className="bg-gray-100 px-1">TWILIO_ACCOUNT_SID</code></li>
+              <li><code className="bg-gray-100 px-1">TWILIO_AUTH_TOKEN</code></li>
+              <li><code className="bg-gray-100 px-1">TWILIO_PHONE_NUMBER</code></li>
+            </ul>
+            <p className="text-sm mt-3">Get these credentials from your Twilio account dashboard at <a href="https://www.twilio.com/console" target="_blank" rel="noopener" className="text-blue-600 underline">twilio.com/console</a></p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full py-2 px-4 bg-gray-200 rounded-lg hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Send SMS Notification</h2>
+          <p className="text-sm text-gray-600 mt-1">Event: {event.title}</p>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading volunteers...</div>
+          ) : (
+            <>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Recipients</label>
+                  <span className="text-sm text-gray-600">{volunteers.length} volunteer(s) with phone numbers</span>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                  {volunteers.length === 0 ? (
+                    <p className="text-sm text-gray-500">No volunteers with phone numbers signed up for this event</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {volunteers.map((v, idx) => (
+                        <div key={idx} className="text-sm">
+                          {v.first_name} {v.last_name} - {v.phone}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                  rows="5"
+                  maxLength="320"
+                  placeholder="Enter your message..."
+                />
+                <div className="text-xs text-gray-500 mt-1">{message.length}/320 characters</div>
+              </div>
+
+              {results.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <h3 className="font-semibold text-sm mb-2">Send Results:</h3>
+                  <div className="space-y-1">
+                    {results.map((result, idx) => (
+                      <div key={idx} className={`text-sm ${result.status === 'sent' ? 'text-green-600' : 'text-red-600'}`}>
+                        {result.name}: {result.status === 'sent' ? '✓ Sent' : `✗ Failed - ${result.error}`}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2 px-4 border rounded-lg hover:bg-gray-50"
+                  disabled={sending}
+                >
+                  {results.length > 0 ? 'Close' : 'Cancel'}
+                </button>
+                {volunteers.length > 0 && results.length === 0 && (
+                  <button
+                    onClick={handleSendSMS}
+                    disabled={sending || !message.trim()}
+                    className="flex-1 py-2 px-4 text-white rounded-lg disabled:opacity-50"
+                    style={{ backgroundColor: CONFIG.primaryColor }}
+                  >
+                    {sending ? 'Sending...' : `Send to ${volunteers.length} Volunteer(s)`}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -712,7 +1150,7 @@ function MemberFormModal({ member, onClose, onSave }) {
     email: member?.email || '',
     phone: member?.phone || '',
     member_number: member?.member_number || '',
-    is_active: member?.is_active ?? true,
+    status: member?.status || 'Active',
     is_admin: member?.is_admin ?? false,
   });
   const [saving, setSaving] = useState(false);
@@ -805,23 +1243,59 @@ function MemberFormModal({ member, onClose, onSave }) {
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              placeholder="(555) 123-4567"
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
             />
           </div>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.is_active}
-                onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                className="rounded"
-              />
-              <span className="text-sm">Active</span>
-            </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({...formData, status: e.target.value})}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={formData.is_admin}
+                onChange={(e) => setFormData({...formData, is_admin: e.target.checked})}
+                className="rounded"
+              />
+              <span className="text-sm">Admin Access</span>
+            </label>
+          </div>
+          
+          {error && (
+            <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>
+          )}
+          
+          <div className="flex gap-2 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 px-4 border rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2 px-4 text-white rounded-lg"
+              style={{ backgroundColor: CONFIG.primaryColor }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
                 onChange={(e) => setFormData({...formData, is_admin: e.target.checked})}
                 className="rounded"
               />
