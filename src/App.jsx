@@ -484,9 +484,145 @@ function getCategoryColor(category) {
   return colors[category] || '#f3f4f6';
 }
 
+// Admin Calendar View Component
+function AdminCalendarView({ events }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const goToPreviousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const getEventsForDate = (date) => {
+    if (!date) return [];
+    const dateStr = date.toISOString().split('T')[0];
+    return events.filter(event => event.event_date === dateStr);
+  };
+
+  const calendarDays = getCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-4">
+      <div className="flex justify-between items-center mb-4">
+        <button
+          onClick={goToPreviousMonth}
+          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+        >
+          ← Prev
+        </button>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold">
+            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </h2>
+          <button
+            onClick={goToToday}
+            className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
+          >
+            Today
+          </button>
+        </div>
+        <button
+          onClick={goToNextMonth}
+          className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+        >
+          Next →
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {dayNames.map(day => (
+          <div key={day} className="text-center font-semibold text-gray-600 p-2 text-sm">
+            {day}
+          </div>
+        ))}
+        {calendarDays.map((day, index) => {
+          const dayEvents = day ? getEventsForDate(day) : [];
+          const isToday = day && isSameDay(day, new Date());
+          const isSelected = day && selectedDate && isSameDay(day, selectedDate);
+          
+          return (
+            <div
+              key={index}
+              onClick={() => day && setSelectedDate(day)}
+              className={`min-h-24 p-2 border rounded cursor-pointer transition-colors ${
+                !day ? 'bg-gray-50' : isSelected ? 'bg-blue-100 border-blue-500' : isToday ? 'bg-green-50 border-green-500' : 'bg-white hover:bg-gray-50'
+              }`}
+            >
+              {day && (
+                <>
+                  <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-green-700' : 'text-gray-700'}`}>
+                    {day.getDate()}
+                  </div>
+                  {dayEvents.map(event => (
+                    <div
+                      key={event.id}
+                      className="text-xs p-1 mb-1 rounded truncate"
+                      style={{ backgroundColor: getCategoryColor(event.category) }}
+                      title={event.title}
+                    >
+                      {event.title}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedDate && (
+        <div className="mt-4 pt-4 border-t">
+          <h3 className="font-semibold mb-2">
+            Events on {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          </h3>
+          {selectedEvents.length === 0 ? (
+            <p className="text-gray-500 text-sm">No events on this day.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedEvents.map(event => (
+                <div key={event.id} className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-semibold" style={{ color: CONFIG.primaryColor }}>{event.title}</h4>
+                    {event.category && (
+                      <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded">
+                        {event.category}
+                      </span>
+                    )}
+                  </div>
+                  {event.description && <p className="text-sm text-gray-600 mb-2">{event.description}</p>}
+                  <div className="text-sm text-gray-500">
+                    {event.start_time && (
+                      <div>🕐 {formatTime(event.start_time)} {event.end_time && `- ${formatTime(event.end_time)}`}</div>
+                    )}
+                    {event.location && <div>📍 {event.location}</div>}
+                    <div className="font-medium text-gray-700">
+                      👥 {event.signup_count} / {event.max_volunteers} volunteers signed up
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Admin Dashboard
 function AdminDashboard({ member, onLogout, onSwitchToMember }) {
-  const [view, setView] = useState('events');
+  const [view, setView] = useState('calendar');
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -580,7 +716,7 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
 
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex gap-2 mb-4">
-          {['events', 'members', 'reports'].map(tab => (
+          {['calendar', 'events', 'members', 'reports'].map(tab => (
             <button
               key={tab}
               onClick={() => setView(tab)}
@@ -598,6 +734,10 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
           <div className="text-center py-8 text-gray-500">Loading...</div>
         ) : (
           <>
+            {view === 'calendar' && (
+              <AdminCalendarView events={events} />
+            )}
+
             {view === 'events' && (
               <div>
                 <div className="flex justify-between items-center mb-4">
@@ -662,7 +802,7 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
             {view === 'members' && (
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold">Members ({members.length})</h2>
+                  <h2 className="text-xl font-semibold">Active Members ({members.filter(m => m.status === 'Active').length})</h2>
                   <button
                     onClick={() => { setEditingMember(null); setShowMemberForm(true); }}
                     className="px-4 py-2 text-white rounded-lg"
@@ -684,7 +824,7 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {members.map(m => (
+                      {members.filter(m => m.status === 'Active').map(m => (
                         <tr key={m.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             {m.first_name} {m.last_name}
@@ -693,8 +833,8 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
                           <td className="px-4 py-3 text-sm">{m.member_number}</td>
                           <td className="px-4 py-3 text-sm">{m.email}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded ${m.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {m.is_active ? 'Active' : 'Inactive'}
+                            <span className={`px-2 py-1 text-xs rounded ${m.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {m.status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm">
@@ -728,13 +868,9 @@ function AdminDashboard({ member, onLogout, onSwitchToMember }) {
             {view === 'reports' && (
               <div>
                 <h2 className="text-xl font-semibold mb-4">Reports</h2>
-                <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
                   <div className="bg-white p-4 rounded-lg shadow">
-                    <div className="text-3xl font-bold" style={{ color: CONFIG.primaryColor }}>{members.length}</div>
-                    <div className="text-gray-600">Total Members</div>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <div className="text-3xl font-bold" style={{ color: CONFIG.primaryColor }}>{members.filter(m => m.is_active).length}</div>
+                    <div className="text-3xl font-bold" style={{ color: CONFIG.primaryColor }}>{members.filter(m => m.status === 'Active').length}</div>
                     <div className="text-gray-600">Active Members</div>
                   </div>
                   <div className="bg-white p-4 rounded-lg shadow">
