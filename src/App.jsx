@@ -46,7 +46,7 @@ function Login({ onLogin }) {
         return;
       }
 
-      if (!member.is_active) {
+      if (member.status !== 'Active') {
         setError('Your membership is inactive. Please contact an administrator.');
         setLoading(false);
         return;
