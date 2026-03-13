@@ -208,7 +208,7 @@ function MemberDashboard({ member, onLogout }) {
     const { data: eventsData } = await supabase
       .from('events')
       .select(`*, signups:event_signups(count)`)
-      .gte('event_date', new Date().toISOString().split('T')[0])
+      .gte('event_date', (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })())
       .order('event_date', { ascending: true });
 
     const processedEvents = (eventsData || []).map(event => ({
@@ -263,10 +263,16 @@ function MemberDashboard({ member, onLogout }) {
     setCurrentDate(new Date());
   };
 
+  const toLocalDateStr = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const getEventsForDate = (date) => {
     if (!date) return [];
-    const dateStr = date.toISOString().split('T')[0];
-    return events.filter(event => event.event_date === dateStr);
+    return events.filter(event => event.event_date === toLocalDateStr(date));
   };
 
   const filteredEvents = view === 'my-signups' 
@@ -501,10 +507,16 @@ function AdminCalendarView({ events }) {
     setCurrentDate(new Date());
   };
 
+  const toLocalDateStr2 = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const getEventsForDate = (date) => {
     if (!date) return [];
-    const dateStr = date.toISOString().split('T')[0];
-    return events.filter(event => event.event_date === dateStr);
+    return events.filter(event => event.event_date === toLocalDateStr2(date));
   };
 
   const calendarDays = getCalendarDays(currentDate.getFullYear(), currentDate.getMonth());
@@ -1155,14 +1167,19 @@ function EventFormModal({ event, onClose, onSave }) {
   });
   const [saving, setSaving] = useState(false);
 
+  const [saveError, setSaveError] = useState('');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError('');
 
     if (event) {
-      await supabase.from('events').update(formData).eq('id', event.id);
+      const { error } = await supabase.from('events').update(formData).eq('id', event.id);
+      if (error) { setSaveError(error.message); setSaving(false); return; }
     } else {
-      await supabase.from('events').insert(formData);
+      const { error } = await supabase.from('events').insert(formData);
+      if (error) { setSaveError(error.message); setSaving(false); return; }
     }
 
     setSaving(false);
@@ -1272,6 +1289,9 @@ function EventFormModal({ event, onClose, onSave }) {
               {saving ? 'Saving...' : 'Save'}
             </button>
           </div>
+          {saveError && (
+            <div className="mt-3 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{saveError}</div>
+          )}
         </form>
       </div>
     </div>
